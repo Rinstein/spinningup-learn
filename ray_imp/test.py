@@ -18,13 +18,18 @@ def test_env(env_name):
     env = gym.make(env_name)
     step = 0
     env.reset()
+    total_episode = 0
     while True:
+        total_episode += 1
         while True:
+            env.render()
             step += 1
             obs, r, done, _ = env.step(env.action_space.sample())
+            print(step, r, obs)
             if done:
+                # env.reset()
                 break
-        print('total step', step)
+        print('total episode', total_episode)
 
 if __name__ == '__main__':
     """内存监控工具"""
@@ -38,4 +43,6 @@ if __name__ == '__main__':
     """数据存储测试"""
     # a = np.array([1] * 100)
     # print(a[np.ones(10, dtype=np.int32)])
-    test_env('HalfCheetah-v2')
+    # test_env('HalfCheetah-v2')
+    test_env('BipedalWalker-v3')
+    # test_env('CartPole-v0')

@@ -7,6 +7,10 @@ from abc import ABCMeta, abstractmethod
 import numpy as np
 
 
+def tensor_wrap(obs, dtype=torch.float32):
+    return torch.as_tensor(obs, dtype=dtype)
+
+
 def wrap_action(action: torch.Tensor):
     if action.numel() == 1:
         return action.item()
@@ -70,10 +74,10 @@ class OffPolicyBuffer(object):
         self.max_size = max_size
         self.ptr = 0
         self.size = 0
-        self.obs = np.zeros([max_size, *obs_dim], dtype=np.float32)
-        self.action = np.zeros([max_size, *action_dim])
+        self.obs = np.zeros([max_size, obs_dim], dtype=np.float32)
+        self.action = np.zeros([max_size, action_dim])
         self.reward = np.zeros([max_size], dtype=np.float32)
-        self.next_obs = np.zeros([max_size, *obs_dim], dtype=np.float32)
+        self.next_obs = np.zeros([max_size, obs_dim], dtype=np.float32)
         self.done = np.zeros([max_size], dtype=np.bool8)
 
     def add(self, obs, action, reward, next_obs, done):
@@ -86,8 +90,9 @@ class OffPolicyBuffer(object):
         self.size = min(self.size + 1, self.max_size)
 
     def sample(self, batch_size):
-        assert self.ptr >= batch_size, "采样数据的条数超出了当前回放池的数据"
-        sample_index = random.randint(0, self.size, batch_size)
+        assert self.size >= batch_size, "采样数据的条数太少，不足以启动训练"
+        # sample_index = random.randint(0, self.size, batch_size)
+        sample_index = np.random.randint(0, self.size, size=(batch_size))
         return self.obs[sample_index], self.action[sample_index], self.reward[sample_index], self.next_obs[
             sample_index], self.done[sample_index]
 
@@ -177,16 +182,28 @@ class MlpActorCritic(nn.Module):
 class DDPGActorCritic(nn.Module):
     def __init__(self, obs_dim, hidden_sizes, action_dim, hidden_act):
         super().__init__()
-        self.pi_net = MlpGaussianActor(obs_dim, hidden_sizes, action_dim, hidden_act)
-        self.q_net = MlpCritic(obs_dim, hidden_sizes, 1, hidden_act)
+        self.pi_net = MlpGaussianActor(obs_dim, hidden_sizes, action_dim, hidden_act, nn.Tanh)
+        self.q_net = MlpCritic(obs_dim + action_dim, hidden_sizes, 1, hidden_act)
 
-    # todo 编写DDPG model
     def step(self, obs):
+        # 用于环境采样数据，不进行梯度计算
         with torch.no_grad():
             action = self.pi_net(obs)
+        return wrap_action(action)
 
+    def get_target_q(self, obs):
+        # 计算目标Q值
+        with torch.no_grad():
+            action = self.pi_net(obs)
+            q = self.q_net(torch.cat((obs, action), 1))
+        return torch.squeeze(q, -1)
 
+    def get_cur_q(self, obs, action):
+        # 计算当前Q值
+        return torch.squeeze(self.q_net(torch.cat((obs, action), 1)), -1)
 
+    def act(self, obs):
+        return self.pi_net(obs)
 
 
 class rl_algorithm(metaclass=ABCMeta):

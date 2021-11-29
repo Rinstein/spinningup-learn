@@ -306,6 +306,7 @@ def ddpg(env_fn, actor_critic=core.MLPActorCritic, ac_kwargs=dict(), seed=0,
             logger.log_tabular('Time', time.time()-start_time)
             logger.dump_tabular()
 
+
 if __name__ == '__main__':
     import argparse
     parser = argparse.ArgumentParser()

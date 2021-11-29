@@ -43,11 +43,14 @@ class Reinforce(object):
         self.actor_opt = Adam(self.actor.parameters(), lr=self.args.lr)
 
     def train(self):
+        total_epoch = 0
         for epoch in range(self.args.epochs):
             batch_obs, batch_action, batch_return = [], [], []
             step = 0
             ep_ret, ep_len = 0, 0
             obs = self.env.reset()
+            real_epoch = 0
+            real_epoch_reward = 0
             while True:
                 step += 1
                 action = self.actor.act(torch.as_tensor(obs, dtype=torch.float32))
@@ -58,6 +61,8 @@ class Reinforce(object):
                 ep_len += 1
                 obs = next_obs
                 if done:
+                    real_epoch += 1
+                    real_epoch_reward += ep_ret
                     batch_return += [ep_ret]*ep_len
                     if step >= self.args.steps_per_epoch:
                         break
@@ -69,6 +74,8 @@ class Reinforce(object):
             pi_loss.backward()
             self.actor_opt.step()
             print("epoch", epoch, "batch_returns", np.mean(batch_return))
+            total_epoch += real_epoch
+            print("total_epoch", total_epoch, "real_epoch_reward", real_epoch_reward/real_epoch)
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
